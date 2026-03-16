@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-medical-light text-slate-900 antialiased;
+}
+
+.glass-panel {
+  @apply bg-white/70 backdrop-blur-md border border-white/60 shadow-glass rounded-3xl;
+}
+
+.section-padding {
+  @apply px-4 sm:px-6 lg:px-10 py-12 md:py-16;
+}
+
+.max-w-page {
+  @apply max-w-6xl mx-auto;
+}
