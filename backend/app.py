@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, List
 
@@ -12,11 +13,27 @@ from joblib import load
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
-MODEL_PATH = PROJECT_ROOT / "ml" / "parkinsons_model.pkl"
-SCALER_PATH = PROJECT_ROOT / "ml" / "scaler.pkl"
+ML_DIR = (BASE_DIR / ".." / "ml").resolve()
+MODEL_PATH = ML_DIR / "parkinsons_model.pkl"
+SCALER_PATH = ML_DIR / "scaler.pkl"
 
 app = Flask(__name__)
-CORS(app, resources={r"/predict": {"origins": "*"}})
+
+def _cors_origins() -> list[str] | str:
+  """
+  Configure allowed CORS origins.
+
+  - In development, default "*" allows local Vite/React calls.
+  - In deployment, set CORS_ORIGINS to a comma-separated list of frontend origins,
+    e.g. "https://your-app.vercel.app,https://yourdomain.com"
+  """
+  raw = os.environ.get("CORS_ORIGINS", "").strip()
+  if not raw:
+    return "*"
+  return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+CORS(app, resources={r"/*": {"origins": _cors_origins()}})
 
 
 def load_model_and_scaler():
@@ -37,9 +54,8 @@ def load_model_and_scaler():
     )
 
   if not scaler_path.exists():
-    # Be tolerant of common Windows duplicate filename like "scaler (2).pkl"
-    ml_dir = PROJECT_ROOT / "ml"
-    candidates = sorted(ml_dir.glob("scaler*.pkl"))
+    # Be tolerant of common duplicate filenames like "scaler (2).pkl"
+    candidates = sorted(ML_DIR.glob("scaler*.pkl"))
     if candidates:
       scaler_path = candidates[0]
     else:
@@ -59,6 +75,11 @@ except FileNotFoundError as exc:
   model = None  # type: ignore[assignment]
   scaler = None  # type: ignore[assignment]
   _load_error = str(exc)
+
+
+@app.get("/")
+def health() -> Any:
+  return jsonify({"status": "API is running"})
 
 
 @app.post("/predict")
@@ -88,30 +109,7 @@ def predict() -> Any:
       jsonify(
         {
           "error": "Invalid input. 'features' must be a list of 22 numeric values.",
-          "example": [
-            119.992,
-            157.302,
-            74.997,
-            0.00784,
-            0.00007,
-            0.00370,
-            0.00554,
-            0.01109,
-            0.04374,
-            0.426,
-            0.02182,
-            0.03130,
-            0.02971,
-            0.06545,
-            0.02211,
-            21.033,
-            0.414783,
-            0.815285,
-            -4.813031,
-            0.266482,
-            2.301442,
-            0.284654,
-          ],
+          "expected_length": 22,
         }
       ),
       400,
@@ -125,11 +123,14 @@ def predict() -> Any:
   except (TypeError, ValueError):
     return jsonify({"error": "All feature values must be numeric."}), 400
 
-  X = np.array(features, dtype=float).reshape(1, -1)
-  X_scaled = scaler.transform(X)
+  try:
+    X = np.array(features, dtype=float).reshape(1, -1)
+    X_scaled = scaler.transform(X)
 
-  # Assume the trained model outputs 1 for Parkinson's, 0 for Healthy
-  y_pred = int(model.predict(X_scaled)[0])
+    # Assume the trained model outputs 1 for Parkinson's, 0 for Healthy
+    y_pred = int(model.predict(X_scaled)[0])
+  except Exception:
+    return jsonify({"error": "Prediction failed."}), 500
 
   prediction_text = "Parkinson's Detected" if y_pred == 1 else "Healthy"
 
@@ -142,5 +143,7 @@ def predict() -> Any:
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000, debug=True)
+  port = int(os.environ.get("PORT", "5000"))
+  debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+  app.run(host="0.0.0.0", port=port, debug=debug)
 

@@ -32,6 +32,9 @@ const sampleValues = [
 ];
 
 export default function ParkinsonPredictor() {
+  const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ||
+    "http://localhost:5000";
   const [form, setForm] = useState(
     featureFields.reduce((acc, field) => ({ ...acc, [field.name]: "" }), {})
   );
@@ -65,7 +68,7 @@ export default function ParkinsonPredictor() {
         Number(form[field.name] || 0)
       );
 
-      const res = await fetch("http://localhost:5000/predict", {
+      const res = await fetch(`${API_BASE_URL}/predict`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
