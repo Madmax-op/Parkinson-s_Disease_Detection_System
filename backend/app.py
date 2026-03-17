@@ -55,16 +55,22 @@ def load_model_and_scaler():
 
   if not scaler_path.exists():
     # Be tolerant of common duplicate filenames like "scaler (2).pkl"
-    candidates = sorted(ML_DIR.glob("scaler*.pkl"))
-    if candidates:
-      scaler_path = candidates[0]
+    preferred = ML_DIR / "scaler (2).pkl"
+    if preferred.exists():
+      scaler_path = preferred
     else:
-      raise FileNotFoundError(
-        "Scaler file not found. Expected 'ml/scaler.pkl' (or a file matching 'ml/scaler*.pkl')."
-      )
+      candidates = sorted(ML_DIR.glob("scaler*.pkl"))
+      if candidates:
+        scaler_path = candidates[0]
+      else:
+        raise FileNotFoundError(
+          "Scaler file not found. Expected 'ml/scaler.pkl' (or a file matching 'ml/scaler*.pkl')."
+        )
 
   model = load(model_path)
   scaler = load(scaler_path)
+  print(f"[startup] Loaded model: {model_path}")
+  print(f"[startup] Loaded scaler: {scaler_path}")
   return model, scaler
 
 
