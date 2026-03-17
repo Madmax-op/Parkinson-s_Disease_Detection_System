@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Tuple
 
 import json
 import numpy as np
@@ -71,15 +71,24 @@ def load_model_and_scaler():
 try:
   model, scaler = load_model_and_scaler()
   _load_error = ""
-except FileNotFoundError as exc:
+except Exception as exc:
   model = None  # type: ignore[assignment]
   scaler = None  # type: ignore[assignment]
-  _load_error = str(exc)
+  _load_error = f"{type(exc).__name__}: {exc}"
+  print(f"[startup] Failed to load model/scaler: {_load_error}")
+  print(f"[startup] MODEL_PATH={MODEL_PATH} exists={MODEL_PATH.exists()}")
+  print(f"[startup] SCALER_PATH={SCALER_PATH} exists={SCALER_PATH.exists()}")
+  print(f"[startup] ML_DIR={ML_DIR} exists={ML_DIR.exists()}")
 
 
 @app.get("/")
 def health() -> Any:
-  return jsonify({"status": "API is running"})
+  return jsonify(
+    {
+      "status": "API is running",
+      "model_loaded": bool(model is not None and scaler is not None),
+    }
+  )
 
 
 @app.post("/predict")
